@@ -162,8 +162,30 @@ async def cmd_results(m: types.Message):
 # ============================================================
 @dp.message(F.text)
 async def free_answer(m: types.Message):
+    # Игнорируем команды
     if m.text and m.text.startswith("/"):
         return
+    
+    # Проверяем, адресовано ли сообщение боту:
+    # 1. Это ответ (reply) на сообщение бота
+    is_reply_to_bot = (
+        m.reply_to_message and 
+        m.reply_to_message.from_user.id == bot.id
+    )
+    
+    # 2. В тексте есть упоминание username бота ИЛИ слово "бро"
+    bot_username = (await bot.get_me()).username
+    mention = f"@{bot_username}"
+    trigger_word = "бро"  # <-- МОЖЕШЬ ПОМЕНЯТЬ НА ДРУГОЕ СЛОВО
+    is_mentioned = mention in m.text.lower() or trigger_word in m.text.lower()
+    
+    # 3. Это личное сообщение (не в группе)
+    is_private = m.chat.type == "private"
+    
+    # Реагируем только если сообщение адресовано боту
+    if not (is_reply_to_bot or is_mentioned or is_private):
+        return
+    
     await bot.send_chat_action(m.chat.id, "typing")
     await m.answer(ask_ai(m.text))
 
