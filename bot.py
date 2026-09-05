@@ -3,6 +3,8 @@ import json
 import sqlite3
 import asyncio
 import requests
+import threading
+from flask import Flask
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 
@@ -154,9 +156,21 @@ async def free_answer(m: types.Message):
     await bot.send_chat_action(m.chat.id, "typing")
     await m.answer(ask_ai(m.text))
 
-# ============================================================#  ЗАПУСК
 # ============================================================
+#  ЗАПУСК (БОТ + МИНИ-СЕРВЕР ДЛЯ RENDER)
+# ============================================================
+app = Flask('')
+@app.route('/')
+def home():
+    return "Бот КИНОман жив и работает! 🎬"
+
+def run_server():
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
+
 async def main():
+    # Запускаем сервер в фоне, чтобы Render не убивал процесс
+    threading.Thread(target=run_server).start()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
