@@ -48,48 +48,62 @@ class CreatePoll(StatesGroup):
     waiting_question = State()
     waiting_options = State()
 # ============================================================
-#  ИИ-ответ (Модель Google Gemma 4 - умная, гибкая, бесплатная)
+#  ИИ-ответ с автоматической подменой модели (если одна перегружена)
 # ============================================================
 def ask_ai(question):
-    try:
-        r = requests.post(
-            AI_URL,
-            headers={
-                "Authorization": f"Bearer {AI_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost",
-                "X-Title": "Kinoclub Bot"
-            },
-            json={
-                "model": "google/gemma-4-31b-it:free",  # <-- Та самая Gemma 4 из твоего списка!
-                "messages": [
-                    {
-                        "role": "system", 
-                        "content": (
-                            "Ты — дружелюбный и эрудированный помощник 'бро' в киноклубе. "
-                            "Отвечай кратко, полезно и по делу. "
-                            "Общайся неформально, как хороший друг. "
-                            "Если не знаешь ответа на вопрос о свежих новинках, честно скажи об этом, но постарайся предложить похожий проверенный фильм."
-                        )
-                    },
-                    {
-                        "role": "user", 
-                        "content": question
-                    }
-                ]
-            },
-            timeout=30
-        )
-        
-        r.raise_for_status()
-        
-        if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"]
-        else:
-            return f"⚠️ Ошибка ИИ: {r.status_code}\n{r.text}"
+    # Список бесплатных моделей. Если первая выдаст 429, бот сам попробует следующую.
+    models_to_try = [
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "meta-llama/llama-3-8b-instruct:free"
+    ]
+    
+    for model in models_to_try:
+        try:
+            r = requests.post(
+                AI_URL,
+                headers={
+                    "Authorization": f"Bearer {AI_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "http://localhost",
+                    "X-Title": "Kinoclub Bot"
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system", 
+                            "content": (
+                                "Ты — дружелюбный и эрудированный помощник 'бро' в киноклубе. "
+                                "Отвечай кратко, полезно и по делу. Общайся неформально, как хороший друг. "
+                                "Если не знаешь ответа на вопрос о свежих новинках, честно скажи об этом."
+                            )
+                        },
+                        {
+                            "role": "user", 
+                            "content": question
+                        }
+                    ]
+                },
+                timeout=30
+            )
             
-    except Exception as e:
-        return f"⚠️ Техническая ошибка:\n`{str(e)}`"
+            # Если модель перегружена (429), цикл продолжится и попробует следующую модель
+            r.raise_for_status()
+            
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"]
+                
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                continue  # Модель перегружена, пробуем следующую из списка
+            else:
+                return f"⚠️ Ошибка ИИ: {e.response.status_code}"
+        except Exception as e:
+            return f"⚠️ Техническая ошибка:\n`{str(e)}`"
+            
+    # Если все модели из списка вернули 429
+    return "⚠️ Все бесплатные модели ИИ временно перегружены. Попробуй написать 'бро' через пару минут!"
 # ============================================================
 #  МЕНЮ И КОМАНДЫ
 # ============================================================
