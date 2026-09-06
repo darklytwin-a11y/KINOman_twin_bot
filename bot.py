@@ -87,7 +87,6 @@ def main_menu_kb():
     )
     return kb
 
-# Клавиатура отмены (показывается во время создания опроса)
 def cancel_kb():
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
@@ -96,31 +95,27 @@ def cancel_kb():
         resize_keyboard=True
     )
     return kb
-# Список текстов кнопок меню (чтобы не попадали в ИИ)
-MENU_BUTTONS = [
-    "📅 Расписание", "📊 Итоги голосов", "❓ Помощь", 
-    "🎬 Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
-]
+
+# Ключевые слова кнопок (для проверки через "in")MENU_KEYWORDS = ["Расписание", "Итоги голосов", "Помощь", "Спросить ИИ", "Создать опрос", "Отмена"]
 
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
-@dp.message(F.text == "📅 Расписание")
-@dp.message(F.text == "📊 Итоги голосов")
-@dp.message(F.text == "❓ Помощь")
-@dp.message(F.text == " Спросить ИИ")
-@dp.message(F.text == "📋 Создать опрос")
+@dp.message(F.text)
 async def cmd_menu(m: types.Message, state: FSMContext):
-    if m.text == "📅 Расписание":
+    text = m.text or ""
+    
+    # Проверяем по ключевым словам (работает с любым эмодзи!)
+    if "Расписание" in text:
         await m.answer(
             "📅 **Расписание киноклуба:**\n"
             "• В 19:00 в любой день по итогам голосования\n"
             "• Место встречи — Кинозал ДК или см. в закрепе канала при изменении\n"
         )
     
-    elif m.text == "📊 Итоги голосов":
+    elif "Итоги голосов" in text:
         await cmd_results(m)
     
-    elif m.text == "❓ Помощь":
+    elif "Помощь" in text:
         await m.answer(
             "🤖 **Команды бота КИНОман:**\n\n"
             "• /start или /меню — главное меню\n"
@@ -133,34 +128,38 @@ async def cmd_menu(m: types.Message, state: FSMContext):
             "Например: «Какой фильм посоветуешь на вечер?»"
         )
     
-    elif m.text == "🎬 Спросить ИИ":  # ← НОВЫЙ БЛОК
+    elif "Спросить ИИ" in text:
         await m.answer(
             "Здравствуйте! Я готов помочь. Задавайте ваши вопросы — постараюсь ответить максимально полезно. 😊\n\n"
             "Обращайтесь ко мне — **бро**!\n\n"
             "Например: «Бро, какой фильм посоветуешь на вечер?»"
         )
     
-    elif m.text == "📋 Создать опрос":
+    elif "Создать опрос" in text:
         if m.from_user.id != ADMIN_ID:
             await m.answer("⛔ Эта функция доступна только администратору!")
             return
         
         await m.answer(
-            "🎬 **Создание нового голосования**\n\n"
+            " **Создание нового голосования**\n\n"
             "Напиши вопрос для голосования, например:\n"
             "«Какой фильм смотрим в пятницу?»\n\n"
-            "💡 В любой момент напиши /отмена или нажми ❌ Отмена, чтобы выйти.",
-            reply_markup=cancel_kb()
-        )
+            "💡 В любой момент напиши /отмена или нажми  Отмена, чтобы выйти.",
+            reply_markup=cancel_kb()        )
         await state.set_state(CreatePoll.waiting_question)
     
+    elif "Отмена" in text:
+        await cmd_cancel(m, state)
+    
     else:
+        # Главное меню (при /start или /меню)
         await m.answer(
-            "Привет! Я бот КИНОман 🎬\n\n"
+            "Привет! Я бот КИНОман \n\n"
             "**Что я умею:**\n"
             "• 📅 Расписание — узнать, когда встречи\n"
             "• 📊 Итоги голосов — результаты последнего голосования\n"
             "• ❓ Помощь — список команд\n"
+            "•  Спросить ИИ — задать вопрос ИИ\n"
             "• 📋 Создать опрос — создать новое голосование (админ)\n\n"
             "💬 **А ещё:** я отвечаю на любые вопросы про кино!\n"
             "Просто напиши мне, например: «Какой фильм посоветуешь на вечер?»\n\n"
@@ -179,7 +178,7 @@ async def cmd_active_poll(m: types.Message):
         ).fetchone()
     
     if not poll:
-        await m.answer("📭 Сейчас нет активных голосований.")
+        await m.answer(" Сейчас нет активных голосований.")
         return
     
     pid, q_text, opts = poll
@@ -195,15 +194,14 @@ async def cmd_active_poll(m: types.Message):
     
     await m.answer(
         f"🗳 **Активное голосование #{pid}**\n\n"
-        f"**{q_text}**\n\n"
-        "Нажмите кнопку, чтобы проголосовать:",
+        f"**{q_text}**\n\n"        "Нажмите кнопку, чтобы проголосовать:",
         reply_markup=kb
     )
 
 # ============================================================
 #  КОМАНДА ОТМЕНЫ (только для админа)
-# ============================================================@dp.message(Command("отмена"))
-@dp.message(F.text == "❌ Отмена")
+# ============================================================
+@dp.message(Command("отмена"))
 async def cmd_cancel(m: types.Message, state: FSMContext):
     if m.from_user.id != ADMIN_ID:
         await m.answer("⛔ Эта команда доступна только администратору!")
@@ -211,7 +209,7 @@ async def cmd_cancel(m: types.Message, state: FSMContext):
     
     current_state = await state.get_state()
     if current_state is None:
-        await m.answer("ℹ️ Сейчас нечего отменять. Создание опроса не активно.")
+        await m.answer("️ Сейчас нечего отменять. Создание опроса не активно.")
         return
     
     await state.clear()
@@ -241,23 +239,21 @@ async def cmd_create_poll(m: types.Message, state: FSMContext):
 
 @dp.message(CreatePoll.waiting_question)
 async def process_question(m: types.Message, state: FSMContext):
-    # Если нажал кнопку отмены
-    if m.text == "❌ Отмена":
+    if "Отмена" in (m.text or ""):
         return await cmd_cancel(m, state)
     
     await state.update_data(question=m.text)
-    await m.answer(
-        "✅ Вопрос принят!\n\n"
+    await m.answer(        "✅ Вопрос принят!\n\n"
         "Теперь напиши варианты ответов через запятую, например:\n"
         "«Дюна 2, Оппенгеймер, Барби, Бойцовский клуб»\n\n"
         "💡 Для отмены напиши /отмена или нажми ❌ Отмена",
-        reply_markup=cancel_kb()    )
+        reply_markup=cancel_kb()
+    )
     await state.set_state(CreatePoll.waiting_options)
 
 @dp.message(CreatePoll.waiting_options)
 async def process_options(m: types.Message, state: FSMContext):
-    # Если нажал кнопку отмены
-    if m.text == "❌ Отмена":
+    if "Отмена" in (m.text or ""):
         return await cmd_cancel(m, state)
     
     data = await state.get_data()
@@ -288,7 +284,6 @@ async def process_options(m: types.Message, state: FSMContext):
         reply_markup=kb
     )
     
-    # Возвращаем главное меню
     await m.answer("Выбери раздел 👇", reply_markup=main_menu_kb())
     await state.clear()
 
@@ -297,8 +292,7 @@ async def process_options(m: types.Message, state: FSMContext):
 # ============================================================
 @dp.callback_query(F.data.startswith("vote:"))
 async def on_vote(q: types.CallbackQuery):
-    _, poll_id, opt = q.data.split(":")
-    poll_id, opt = int(poll_id), int(opt)
+    _, poll_id, opt = q.data.split(":")    poll_id, opt = int(poll_id), int(opt)
     
     with sqlite3.connect(DB) as c:
         try:
@@ -330,7 +324,7 @@ async def cmd_results(m: types.Message):
         counts[o] = n
         total += n
     
-    lines = [f"📊 **Итоги голосования #{pid}**", f"«{q_text}»", ""]
+    lines = [f" **Итоги голосования #{pid}**", f"«{q_text}»", ""]
     for i, opt in enumerate(options):
         pct = round(counts[i] / total * 100) if total else 0
         lines.append(f"{opt}: {'█' * counts[i]} {counts[i]} ({pct}%)")
@@ -342,15 +336,22 @@ async def cmd_results(m: types.Message):
 #  ЛЮБОЙ ДРУГОЙ ТЕКСТ → ОТВЕТ ИИ
 # ============================================================
 @dp.message(F.text)
-async def free_answer(m: types.Message):
+async def free_answer(m: types.Message, state: FSMContext):
     # Игнорируем команды
     if m.text and m.text.startswith("/"):
         return
     
-    # Игнорируем кнопки меню
-    if m.text in MENU_BUTTONS:
+    # Игнорируем кнопки меню (проверка по ключевым словам)    text = m.text or ""
+    for keyword in MENU_KEYWORDS:
+        if keyword in text:
+            return
+    
+    # Если бот в процессе создания опроса — игнорируем (это обрабатывается FSM)
+    current_state = await state.get_state()
+    if current_state is not None:
         return
-        # Проверяем, адресовано ли сообщение боту
+    
+    # Проверяем, адресовано ли сообщение боту
     is_reply_to_bot = (
         m.reply_to_message and 
         m.reply_to_message.from_user.id == bot.id
@@ -376,7 +377,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Бот КИНОман жив и работает! 🎬"
+    return "Бот КИНОман жив и работает! "
 
 def run_server():
     port = int(os.environ.get('PORT', 5000))
