@@ -292,7 +292,8 @@ async def on_vote(q: types.CallbackQuery):
     _, poll_id, opt = q.data.split(":")
     poll_id, opt = int(poll_id), int(opt)
     
-    with sqlite3.connect(DB) as c:        try:
+    with sqlite3.connect(DB) as c:
+        try:
             c.execute("INSERT INTO votes(poll_id, user_id, option) VALUES(?,?,?)",
                       (poll_id, q.from_user.id, opt))
         except sqlite3.IntegrityError:
