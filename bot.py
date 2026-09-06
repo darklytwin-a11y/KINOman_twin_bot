@@ -81,14 +81,15 @@ def main_menu_kb():
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="📅 Расписание"), types.KeyboardButton(text="📊 Итоги голосов")],
-            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text="🎬 Спросить ИИ")]
+            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text="🎬 Спросить ИИ")],
+            [types.KeyboardButton(text="📋 Создать опрос")]
         ],
         resize_keyboard=True
     )
     return kb
 
 # Список текстов кнопок меню (чтобы не попадали в ИИ)
-MENU_BUTTONS = ["📅 Расписание", " Итоги голосов", "❓ Помощь", "🎬 Спросить ИИ"]
+MENU_BUTTONS = ["📅 Расписание", "📊 Итоги голосов", "❓ Помощь", "🎬 Спросить ИИ", " Создать опрос"]
 
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
@@ -105,6 +106,19 @@ async def cmd_menu(m: types.Message):
         )
     elif m.text == " Итоги голосов":
         await cmd_results(m)
+            elif m.text == " Создать опрос":
+        # Проверяем, что это админ
+        if m.from_user.id != ADMIN_ID:
+            await m.answer(" Эта функция доступна только администратору!")
+            return
+        
+        await m.answer(
+            "🎬 **Создание нового голосования**\n\n"
+            "Напиши вопрос для голосования, например:\n"
+            "«Какой фильм смотрим в пятницу?»",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+        await state.set_state(CreatePoll.waiting_question)
     elif m.text == "❓ Помощь":
         await m.answer(
             "🤖 **Команды бота КИНОман:**\n\n"
@@ -122,6 +136,7 @@ async def cmd_menu(m: types.Message):
             "**Что я умею:**\n"
             "• 📅 Расписание — узнать, когда встречи\n"
             "• 📊 Итоги голосов — результаты последнего голосования\n"
+            "• 📋 Создать опрос — создать новое голосование (админ)\n"
             "• ❓ Помощь — список команд\n\n"
             "💬 **А ещё:** я отвечаю на любые вопросы про кино!\n"
             "Просто напиши мне, например: «Какой фильм посоветуешь на вечер?»\n\n"
