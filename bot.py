@@ -107,12 +107,12 @@ MENU_BUTTONS = [
 @dp.message(F.text == "📅 Расписание")
 @dp.message(F.text == "📊 Итоги голосов")
 @dp.message(F.text == "❓ Помощь")
-@dp.message(F.text == "🎬 Спросить ИИ")
+@dp.message(F.text == " Спросить ИИ")
 @dp.message(F.text == "📋 Создать опрос")
 async def cmd_menu(m: types.Message, state: FSMContext):
     if m.text == "📅 Расписание":
         await m.answer(
-            " **Расписание киноклуба:**\n"
+            "📅 **Расписание киноклуба:**\n"
             "• В 19:00 в любой день по итогам голосования\n"
             "• Место встречи — Кинозал ДК или см. в закрепе канала при изменении\n"
         )
@@ -122,7 +122,7 @@ async def cmd_menu(m: types.Message, state: FSMContext):
     
     elif m.text == "❓ Помощь":
         await m.answer(
-            " **Команды бота КИНОман:**\n\n"
+            "🤖 **Команды бота КИНОман:**\n\n"
             "• /start или /меню — главное меню\n"
             "• /создать_опрос — создать голосование (только админ)\n"
             "• /активное — показать текущее голосование\n"
@@ -131,6 +131,13 @@ async def cmd_menu(m: types.Message, state: FSMContext):
             "• /помощь — эта справка\n\n"
             "💬 **ИИ-помощник:** напиши любой вопрос про кино, и я отвечу!\n"
             "Например: «Какой фильм посоветуешь на вечер?»"
+        )
+    
+    elif m.text == "🎬 Спросить ИИ":  # ← НОВЫЙ БЛОК
+        await m.answer(
+            "Здравствуйте! Я готов помочь. Задавайте ваши вопросы — постараюсь ответить максимально полезно. 😊\n\n"
+            "Обращайтесь ко мне — **бро**!\n\n"
+            "Например: «Бро, какой фильм посоветуешь на вечер?»"
         )
     
     elif m.text == "📋 Создать опрос":
@@ -145,7 +152,8 @@ async def cmd_menu(m: types.Message, state: FSMContext):
             "💡 В любой момент напиши /отмена или нажми ❌ Отмена, чтобы выйти.",
             reply_markup=cancel_kb()
         )
-        await state.set_state(CreatePoll.waiting_question)    
+        await state.set_state(CreatePoll.waiting_question)
+    
     else:
         await m.answer(
             "Привет! Я бот КИНОман 🎬\n\n"
