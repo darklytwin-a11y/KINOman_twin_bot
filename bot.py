@@ -21,8 +21,7 @@ AI_API_KEY = os.getenv("AI_API_KEY")
 AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 AI_MODEL = "minimax/minimax-m3:free"
 
-# ID администратора (твой Telegram ID)
-ADMIN_ID = 6519043402  # ЗАМЕНИ НА СВОЙ ID!
+ADMIN_ID = 6519043402
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -81,21 +80,22 @@ def ask_ai(question):
 def main_menu_kb():
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
-            [types.KeyboardButton(text="📅 Расписание"), types.KeyboardButton(text="🗳 Голосовать")],
-            [types.KeyboardButton(text=" Итоги"), types.KeyboardButton(text="❓ Помощь")],
-            [types.KeyboardButton(text="🎬 Спросить ИИ")]
+            [types.KeyboardButton(text="📅 Расписание"), types.KeyboardButton(text="📊 Итоги голосов")],
+            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text="🎬 Спросить ИИ")]
         ],
         resize_keyboard=True
     )
     return kb
 
+# Список текстов кнопок меню (чтобы не попадали в ИИ)
+MENU_BUTTONS = ["📅 Расписание", " Итоги голосов", "❓ Помощь", "🎬 Спросить ИИ"]
+
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
 @dp.message(F.text == "📅 Расписание")
-@dp.message(F.text == "🗳 Голосовать")
-@dp.message(F.text == "📊 Итоги")
+@dp.message(F.text == "📊 Итоги голосов")
 @dp.message(F.text == "❓ Помощь")
-@dp.message(F.text == "🎬 Спросить ИИ")
+@dp.message(F.text == " Спросить ИИ")
 async def cmd_menu(m: types.Message):
     if m.text == "📅 Расписание":
         await m.answer(
@@ -103,15 +103,14 @@ async def cmd_menu(m: types.Message):
             "• В 19:00 в любой день по итогам голосования\n"
             "• Место встречи — Кинозал ДК или см. в закрепе канала при изменении\n"
         )
-    elif m.text == "🗳 Голосовать":
-        await m.answer("Используй /создать_опрос для создания нового голосования")
-    elif m.text == "📊 Итоги":
+    elif m.text == " Итоги голосов":
         await cmd_results(m)
     elif m.text == "❓ Помощь":
         await m.answer(
             "🤖 **Команды бота КИНОман:**\n\n"
             "• /start или /меню — главное меню\n"
             "• /создать_опрос — создать голосование (только админ)\n"
+            "• /активное — показать текущее голосование\n"
             "• /итоги — результаты последнего голосования\n"
             "• /помощь — эта справка\n\n"
             "💬 **ИИ-помощник:** напиши любой вопрос про кино, и я отвечу!\n"
@@ -121,10 +120,9 @@ async def cmd_menu(m: types.Message):
         await m.answer(
             "Привет! Я бот КИНОман 🎬\n\n"
             "**Что я умею:**\n"
-            "• 📅 /расписание — узнать, когда встречи\n"
-            "• 🗳 /создать_опрос — создать голосование (админ)\n"
-            "• 📊 /итоги — посмотреть результаты\n"
-            "• ❓ /помощь — список команд\n\n"
+            "• 📅 Расписание — узнать, когда встречи\n"
+            "• 📊 Итоги голосов — результаты последнего голосования\n"
+            "• ❓ Помощь — список команд\n\n"
             "💬 **А ещё:** я отвечаю на любые вопросы про кино!\n"
             "Просто напиши мне, например: «Какой фильм посоветуешь на вечер?»\n\n"
             "Выбери раздел ниже 👇",
@@ -132,17 +130,48 @@ async def cmd_menu(m: types.Message):
         )
 
 # ============================================================
+#  КОМАНДА: ПОКАЗАТЬ АКТИВНОЕ ГОЛОСОВАНИЕ
+# ============================================================
+@dp.message(Command("активное"))
+async def cmd_active_poll(m: types.Message):
+    with sqlite3.connect(DB) as c:
+        poll = c.execute(
+            "SELECT id, question, options FROM polls ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    
+    if not poll:
+        await m.answer("📭 Сейчас нет активных голосований.")
+        return
+    
+    pid, q_text, opts = poll
+    options = json.loads(opts)
+    
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text=f"{i+1}. {opt}", 
+            callback_data=f"vote:{pid}:{i}"
+        )]
+        for i, opt in enumerate(options)
+    ])
+    
+    await m.answer(
+        f"🗳 **Активное голосование #{pid}**\n\n"
+        f"**{q_text}**\n\n"
+        "Нажмите кнопку, чтобы проголосовать:",
+        reply_markup=kb
+    )
+
+# ============================================================
 #  АДМИН-КОМАНДА: СОЗДАНИЕ ОПРОСА
 # ============================================================
 @dp.message(Command("создать_опрос"))
 async def cmd_create_poll(m: types.Message, state: FSMContext):
-    # Проверяем, что это админ
     if m.from_user.id != ADMIN_ID:
-        await m.answer("⛔ Эта команда доступна только администратору!")
+        await m.answer(" Эта команда доступна только администратору!")
         return
     
     await m.answer(
-        "🎬 **Создание нового голосования**\n\n"
+        " **Создание нового голосования**\n\n"
         "Напиши вопрос для голосования, например:\n"
         "«Какой фильм смотрим в пятницу?»",
         reply_markup=types.ReplyKeyboardRemove()
@@ -164,14 +193,12 @@ async def process_options(m: types.Message, state: FSMContext):
     data = await state.get_data()
     question = data["question"]
     
-    # Разбираем варианты
     options = [opt.strip() for opt in m.text.split(",") if opt.strip()]
     
     if len(options) < 2:
         await m.answer("❌ Нужно минимум 2 варианта! Попробуй ещё раз:")
         return
     
-    # Сохраняем в БД
     with sqlite3.connect(DB) as c:
         cur = c.execute(
             "INSERT INTO polls(question, options, creator) VALUES(?,?,?)",
@@ -179,7 +206,6 @@ async def process_options(m: types.Message, state: FSMContext):
         )
         poll_id = cur.lastrowid
     
-    # Создаём inline-клавиатуру
     kb = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text=f"{i+1}. {opt}", callback_data=f"vote:{poll_id}:{i}")]
         for i, opt in enumerate(options)
@@ -210,7 +236,7 @@ async def on_vote(q: types.CallbackQuery):
             await q.answer("Вы уже голосовали в этом опросе 😉", show_alert=True)
             return
     
-    await q.answer("Голос учтён! Спасибо  (анонимно)", show_alert=True)
+    await q.answer("Голос учтён! Спасибо (анонимно)", show_alert=True)
 
 @dp.message(Command("итоги"))
 async def cmd_results(m: types.Message):
@@ -247,6 +273,10 @@ async def cmd_results(m: types.Message):
 async def free_answer(m: types.Message):
     # Игнорируем команды
     if m.text and m.text.startswith("/"):
+        return
+    
+    # Игнорируем кнопки меню (чтобы не попадали в ИИ)
+    if m.text in MENU_BUTTONS:
         return
     
     # Проверяем, адресовано ли сообщение боту
