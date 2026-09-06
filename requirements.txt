@@ -2,4 +2,3 @@
    requests
    Flask
    python-dotenv
-   duckduckgo-search
