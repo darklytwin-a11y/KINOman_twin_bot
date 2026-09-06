@@ -47,40 +47,10 @@ db_init()
 class CreatePoll(StatesGroup):
     waiting_question = State()
     waiting_options = State()
-from duckduckgo_search import DDGS
-
 # ============================================================
-#  ИИ-ответ с живым поиском
+#  ИИ-ответ (Модель Qwen 2.5 - умная и гибкая)
 # ============================================================
 def ask_ai(question):
-    # 1. Пытаемся получить свежую информацию из интернета
-    web_context = ""
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(question, max_results=2))
-            if results:
-                snippets = [f"• {r.get('title', '')}: {r.get('body', '')}" for r in results]
-                web_context = "\nСвежая информация из поиска:\n" + "\n".join(snippets) + "\n"
-    except Exception:
-        pass
-
-    # 2. Формируем умный промпт
-    if web_context:
-        prompt = (
-            "Ты — полезный и дружелюбный помощник 'бро' в киноклубе. "
-            "Ответь на вопрос пользователя, опираясь в первую очередь на свежую информацию из интернета ниже. "
-            "Если она не подходит к вопросу, используй свои общие знания. Будь краток и полезен.\n\n"
-            f"{web_context}\n"
-            f"Вопрос пользователя: {question}"
-        )
-    else:
-        prompt = (
-            "Ты — полезный и дружелюбный помощник 'бро' в киноклубе. "
-            "Ответь на вопрос пользователя максимально полезно, кратко и по делу.\n\n"
-            f"Вопрос пользователя: {question}"
-        )
-
-    # 3. Отправляем запрос в OpenRouter (модель Qwen — гибкая и умная)
     try:
         r = requests.post(
             AI_URL,
@@ -91,18 +61,31 @@ def ask_ai(question):
                 "X-Title": "Kinoclub Bot"
             },
             json={
-                "model": "qwen/qwen-2.5-72b-instruct:free",
-                "messages": [{"role": "user", "content": prompt}]
+                "model": "qwen/qwen-2.5-72b-instruct:free",  # Модель Qwen
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "Ты — дружелюбный помощник 'бро' в киноклубе. Отвечай кратко, полезно и по делу. Если спрашивают про новые фильмы или новости, опирайся на свои знания."
+                    },
+                    {
+                        "role": "user", 
+                        "content": question
+                    }
+                ]
             },
             timeout=30
         )
+        
+        # Если что-то пошло не так, покажем точную ошибку (для отладки)
+        r.raise_for_status()
+        
         if r.status_code == 200:
             return r.json()["choices"][0]["message"]["content"]
         else:
-            return "Извините, техработы, попробуйте позже."
+            return f"⚠️ Ошибка ИИ: {r.status_code}\n{r.text}"
+            
     except Exception as e:
-        return "Извините, техработы, попробуйте позже."
-
+        return f"⚠️ Техническая ошибка:\n`{str(e)}`"
 # ============================================================
 #  МЕНЮ И КОМАНДЫ
 # ============================================================
