@@ -81,23 +81,36 @@ def main_menu_kb():
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="📅 Расписание"), types.KeyboardButton(text="📊 Итоги голосов")],
-            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text="🎬 Спросить ИИ")],
+            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text=" Спросить ИИ")],
             [types.KeyboardButton(text="📋 Создать опрос")]
         ],
         resize_keyboard=True
     )
     return kb
 
+# Клавиатура отмены (показывается во время создания опроса)
+def cancel_kb():
+    kb = types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text="❌ Отмена")]
+        ],
+        resize_keyboard=True
+    )
+    return kb
+
 # Список текстов кнопок меню (чтобы не попадали в ИИ)
-MENU_BUTTONS = ["📅 Расписание", "📊 Итоги голосов", "❓ Помощь", "🎬 Спросить ИИ", " Создать опрос"]
+MENU_BUTTONS = [
+    "📅 Расписание", "📊 Итоги голосов", "❓ Помощь", 
+    " Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
+]
 
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
-@dp.message(F.text == " Расписание")
-@dp.message(F.text == "📊 Итоги голосов")
+@dp.message(F.text == "📅 Расписание")  # ← ИСПРАВЛЕНО: добавлено эмодзи 
+@dp.message(F.text == " Итоги голосов")
 @dp.message(F.text == "❓ Помощь")
 @dp.message(F.text == "🎬 Спросить ИИ")
-@dp.message(F.text == "📋 Создать опрос")
+@dp.message(F.text == " Создать опрос")
 async def cmd_menu(m: types.Message, state: FSMContext):
     if m.text == "📅 Расписание":
         await m.answer(
@@ -116,13 +129,13 @@ async def cmd_menu(m: types.Message, state: FSMContext):
             "• /создать_опрос — создать голосование (только админ)\n"
             "• /активное — показать текущее голосование\n"
             "• /итоги — результаты последнего голосования\n"
+            "• /отмена — отменить создание опроса (только админ)\n"
             "• /помощь — эта справка\n\n"
             "💬 **ИИ-помощник:** напиши любой вопрос про кино, и я отвечу!\n"
             "Например: «Какой фильм посоветуешь на вечер?»"
         )
     
     elif m.text == "📋 Создать опрос":
-        # Проверяем, что это админ
         if m.from_user.id != ADMIN_ID:
             await m.answer("⛔ Эта функция доступна только администратору!")
             return
@@ -130,13 +143,13 @@ async def cmd_menu(m: types.Message, state: FSMContext):
         await m.answer(
             "🎬 **Создание нового голосования**\n\n"
             "Напиши вопрос для голосования, например:\n"
-            "«Какой фильм смотрим в пятницу?»",
-            reply_markup=types.ReplyKeyboardRemove()
+            "«Какой фильм смотрим в пятницу?»\n\n"
+            "💡 В любой момент напиши /отмена или нажми ❌ Отмена, чтобы выйти.",
+            reply_markup=cancel_kb()
         )
         await state.set_state(CreatePoll.waiting_question)
     
     else:
-        # Главное меню (при /start)
         await m.answer(
             "Привет! Я бот КИНОман 🎬\n\n"
             "**Что я умею:**\n"
@@ -183,6 +196,28 @@ async def cmd_active_poll(m: types.Message):
     )
 
 # ============================================================
+#  КОМАНДА ОТМЕНЫ (только для админа)
+# ============================================================
+@dp.message(Command("отмена"))
+@dp.message(F.text == " Отмена")
+async def cmd_cancel(m: types.Message, state: FSMContext):
+    if m.from_user.id != ADMIN_ID:
+        await m.answer("⛔ Эта команда доступна только администратору!")
+        return
+    
+    current_state = await state.get_state()
+    if current_state is None:
+        await m.answer("ℹ️ Сейчас нечего отменять. Создание опроса не активно.")
+        return
+    
+    await state.clear()
+    await m.answer(
+        "❌ **Создание опроса отменено.**\n\n"
+        "Меню восстановлено ",
+        reply_markup=main_menu_kb()
+    )
+
+# ============================================================
 #  АДМИН-КОМАНДА: СОЗДАНИЕ ОПРОСА
 # ============================================================
 @dp.message(Command("создать_опрос"))
@@ -194,23 +229,34 @@ async def cmd_create_poll(m: types.Message, state: FSMContext):
     await m.answer(
         "🎬 **Создание нового голосования**\n\n"
         "Напиши вопрос для голосования, например:\n"
-        "«Какой фильм смотрим в пятницу?»",
-        reply_markup=types.ReplyKeyboardRemove()
+        "«Какой фильм смотрим в пятницу?»\n\n"
+        "💡 В любой момент напиши /отмена или нажми ❌ Отмена, чтобы выйти.",
+        reply_markup=cancel_kb()
     )
     await state.set_state(CreatePoll.waiting_question)
 
 @dp.message(CreatePoll.waiting_question)
 async def process_question(m: types.Message, state: FSMContext):
+    # Если нажал кнопку отмены
+    if m.text == "❌ Отмена":
+        return await cmd_cancel(m, state)
+    
     await state.update_data(question=m.text)
     await m.answer(
         "✅ Вопрос принят!\n\n"
         "Теперь напиши варианты ответов через запятую, например:\n"
-        "«Дюна 2, Оппенгеймер, Барби, Бойцовский клуб»"
+        "«Дюна 2, Оппенгеймер, Барби, Бойцовский клуб»\n\n"
+        " Для отмены напиши /отмена",
+        reply_markup=cancel_kb()
     )
     await state.set_state(CreatePoll.waiting_options)
 
 @dp.message(CreatePoll.waiting_options)
 async def process_options(m: types.Message, state: FSMContext):
+    # Если нажал кнопку отмены
+    if m.text == "❌ Отмена":
+        return await cmd_cancel(m, state)
+    
     data = await state.get_data()
     question = data["question"]
     
@@ -239,6 +285,8 @@ async def process_options(m: types.Message, state: FSMContext):
         reply_markup=kb
     )
     
+    # Возвращаем главное меню
+    await m.answer("Выбери раздел 👇", reply_markup=main_menu_kb())
     await state.clear()
 
 # ============================================================
@@ -264,7 +312,7 @@ async def cmd_results(m: types.Message):
     with sqlite3.connect(DB) as c:
         poll = c.execute("SELECT id, question, options FROM polls ORDER BY id DESC LIMIT 1").fetchone()
         if not poll:
-            await m.answer("📊 Активных голосований пока нет.")
+            await m.answer(" Активных голосований пока нет.")
             return
         
         pid, q_text, opts = poll
@@ -296,7 +344,7 @@ async def free_answer(m: types.Message):
     if m.text and m.text.startswith("/"):
         return
     
-    # Игнорируем кнопки меню (чтобы не попадали в ИИ)
+    # Игнорируем кнопки меню
     if m.text in MENU_BUTTONS:
         return
     
