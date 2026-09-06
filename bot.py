@@ -47,7 +47,6 @@ db_init()
 class CreatePoll(StatesGroup):
     waiting_question = State()
     waiting_options = State()
-
 # ============================================================
 #  ИИ-ответ
 # ============================================================
@@ -81,7 +80,7 @@ def main_menu_kb():
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="📅 Расписание"), types.KeyboardButton(text="📊 Итоги голосов")],
-            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text=" Спросить ИИ")],
+            [types.KeyboardButton(text="❓ Помощь"), types.KeyboardButton(text="🎬 Спросить ИИ")],
             [types.KeyboardButton(text="📋 Создать опрос")]
         ],
         resize_keyboard=True
@@ -97,24 +96,23 @@ def cancel_kb():
         resize_keyboard=True
     )
     return kb
-
 # Список текстов кнопок меню (чтобы не попадали в ИИ)
 MENU_BUTTONS = [
     "📅 Расписание", "📊 Итоги голосов", "❓ Помощь", 
-    " Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
+    "🎬 Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
 ]
 
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
-@dp.message(F.text == "📅 Расписание")  # ← ИСПРАВЛЕНО: добавлено эмодзи 
-@dp.message(F.text == " Итоги голосов")
+@dp.message(F.text == "📅 Расписание")
+@dp.message(F.text == "📊 Итоги голосов")
 @dp.message(F.text == "❓ Помощь")
 @dp.message(F.text == "🎬 Спросить ИИ")
-@dp.message(F.text == " Создать опрос")
+@dp.message(F.text == "📋 Создать опрос")
 async def cmd_menu(m: types.Message, state: FSMContext):
     if m.text == "📅 Расписание":
         await m.answer(
-            "📅 **Расписание киноклуба:**\n"
+            " **Расписание киноклуба:**\n"
             "• В 19:00 в любой день по итогам голосования\n"
             "• Место встречи — Кинозал ДК или см. в закрепе канала при изменении\n"
         )
@@ -124,7 +122,7 @@ async def cmd_menu(m: types.Message, state: FSMContext):
     
     elif m.text == "❓ Помощь":
         await m.answer(
-            "🤖 **Команды бота КИНОман:**\n\n"
+            " **Команды бота КИНОман:**\n\n"
             "• /start или /меню — главное меню\n"
             "• /создать_опрос — создать голосование (только админ)\n"
             "• /активное — показать текущее голосование\n"
@@ -147,8 +145,7 @@ async def cmd_menu(m: types.Message, state: FSMContext):
             "💡 В любой момент напиши /отмена или нажми ❌ Отмена, чтобы выйти.",
             reply_markup=cancel_kb()
         )
-        await state.set_state(CreatePoll.waiting_question)
-    
+        await state.set_state(CreatePoll.waiting_question)    
     else:
         await m.answer(
             "Привет! Я бот КИНОман 🎬\n\n"
@@ -197,9 +194,8 @@ async def cmd_active_poll(m: types.Message):
 
 # ============================================================
 #  КОМАНДА ОТМЕНЫ (только для админа)
-# ============================================================
-@dp.message(Command("отмена"))
-@dp.message(F.text == " Отмена")
+# ============================================================@dp.message(Command("отмена"))
+@dp.message(F.text == "❌ Отмена")
 async def cmd_cancel(m: types.Message, state: FSMContext):
     if m.from_user.id != ADMIN_ID:
         await m.answer("⛔ Эта команда доступна только администратору!")
@@ -213,7 +209,7 @@ async def cmd_cancel(m: types.Message, state: FSMContext):
     await state.clear()
     await m.answer(
         "❌ **Создание опроса отменено.**\n\n"
-        "Меню восстановлено ",
+        "Меню восстановлено 👇",
         reply_markup=main_menu_kb()
     )
 
@@ -246,9 +242,8 @@ async def process_question(m: types.Message, state: FSMContext):
         "✅ Вопрос принят!\n\n"
         "Теперь напиши варианты ответов через запятую, например:\n"
         "«Дюна 2, Оппенгеймер, Барби, Бойцовский клуб»\n\n"
-        " Для отмены напиши /отмена",
-        reply_markup=cancel_kb()
-    )
+        "💡 Для отмены напиши /отмена или нажми ❌ Отмена",
+        reply_markup=cancel_kb()    )
     await state.set_state(CreatePoll.waiting_options)
 
 @dp.message(CreatePoll.waiting_options)
@@ -297,8 +292,7 @@ async def on_vote(q: types.CallbackQuery):
     _, poll_id, opt = q.data.split(":")
     poll_id, opt = int(poll_id), int(opt)
     
-    with sqlite3.connect(DB) as c:
-        try:
+    with sqlite3.connect(DB) as c:        try:
             c.execute("INSERT INTO votes(poll_id, user_id, option) VALUES(?,?,?)",
                       (poll_id, q.from_user.id, opt))
         except sqlite3.IntegrityError:
@@ -312,7 +306,7 @@ async def cmd_results(m: types.Message):
     with sqlite3.connect(DB) as c:
         poll = c.execute("SELECT id, question, options FROM polls ORDER BY id DESC LIMIT 1").fetchone()
         if not poll:
-            await m.answer(" Активных голосований пока нет.")
+            await m.answer("📊 Активных голосований пока нет.")
             return
         
         pid, q_text, opts = poll
@@ -347,8 +341,7 @@ async def free_answer(m: types.Message):
     # Игнорируем кнопки меню
     if m.text in MENU_BUTTONS:
         return
-    
-    # Проверяем, адресовано ли сообщение боту
+        # Проверяем, адресовано ли сообщение боту
     is_reply_to_bot = (
         m.reply_to_message and 
         m.reply_to_message.from_user.id == bot.id
