@@ -47,8 +47,7 @@ class CreatePoll(StatesGroup):
     waiting_question = State()
     waiting_options = State()
 
-# ============================================================
-#  ИИ-ответ
+# ============================================================#  ИИ-ответ
 # ============================================================
 def ask_ai(question):
     try:
@@ -97,8 +96,7 @@ def cancel_kb():
     return kb
 
 MENU_BUTTONS = [
-    "📅 Расписание", "📊 Итоги голосов", "❓ Помощь", 
-    "🎬 Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
+    "📅 Расписание", "📊 Итоги голосов", "❓ Помощь",     "🎬 Спросить ИИ", "📋 Создать опрос", "❌ Отмена"
 ]
 
 @dp.message(Command("start"))
@@ -147,8 +145,7 @@ async def cmd_menu(m: types.Message, state: FSMContext):
         )
         await state.set_state(CreatePoll.waiting_question)
     else:
-        await m.answer(
-            "Привет! Я бот КИНОман 🎬\n\n"
+        await m.answer(            "Привет! Я бот КИНОман 🎬\n\n"
             "**Что я умею:**\n"
             "• 📅 Расписание — узнать, когда встречи\n"
             "• 📊 Итоги голосов — результаты последнего голосования\n"
@@ -197,8 +194,7 @@ async def cmd_cancel(m: types.Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state is None:
         await m.answer("ℹ️ Сейчас нечего отменять. Создание опроса не активно.")
-        return
-    await state.clear()
+        return    await state.clear()
     await m.answer(
         "❌ **Создание опроса отменено.**\n\n"
         "Меню восстановлено 👇",
@@ -247,8 +243,7 @@ async def process_options(m: types.Message, state: FSMContext):
         await m.answer("❌ Нужно минимум 2 варианта! Попробуй ещё раз:")
         return
     with sqlite3.connect(DB) as c:
-        cur = c.execute(
-            "INSERT INTO polls(question, options, creator) VALUES(?,?,?)",
+        cur = c.execute(            "INSERT INTO polls(question, options, creator) VALUES(?,?,?)",
             (question, json.dumps(options, ensure_ascii=False), m.from_user.id)
         )
         poll_id = cur.lastrowid
@@ -297,8 +292,7 @@ async def cmd_results(m: types.Message):
     total = 0
     for o, n in rows:
         counts[o] = n
-        total += n
-    lines = [f"📊 **Итоги голосования #{pid}**", f"«{q_text}»", ""]
+        total += n    lines = [f"📊 **Итоги голосования #{pid}**", f"«{q_text}»", ""]
     for i, opt in enumerate(options):
         pct = round(counts[i] / total * 100) if total else 0
         lines.append(f"{opt}: {'█' * counts[i]} {counts[i]} ({pct}%)")
