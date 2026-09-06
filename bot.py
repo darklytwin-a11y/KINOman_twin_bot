@@ -93,32 +93,22 @@ MENU_BUTTONS = ["📅 Расписание", "📊 Итоги голосов", "
 
 @dp.message(Command("start"))
 @dp.message(Command("меню"))
-@dp.message(F.text == "📅 Расписание")
+@dp.message(F.text == " Расписание")
 @dp.message(F.text == "📊 Итоги голосов")
 @dp.message(F.text == "❓ Помощь")
-@dp.message(F.text == " Спросить ИИ")
-async def cmd_menu(m: types.Message):
+@dp.message(F.text == "🎬 Спросить ИИ")
+@dp.message(F.text == "📋 Создать опрос")
+async def cmd_menu(m: types.Message, state: FSMContext):
     if m.text == "📅 Расписание":
         await m.answer(
             "📅 **Расписание киноклуба:**\n"
             "• В 19:00 в любой день по итогам голосования\n"
             "• Место встречи — Кинозал ДК или см. в закрепе канала при изменении\n"
         )
-    elif m.text == " Итоги голосов":
+    
+    elif m.text == "📊 Итоги голосов":
         await cmd_results(m)
-            elif m.text == " Создать опрос":
-        # Проверяем, что это админ
-        if m.from_user.id != ADMIN_ID:
-            await m.answer(" Эта функция доступна только администратору!")
-            return
-        
-        await m.answer(
-            "🎬 **Создание нового голосования**\n\n"
-            "Напиши вопрос для голосования, например:\n"
-            "«Какой фильм смотрим в пятницу?»",
-            reply_markup=types.ReplyKeyboardRemove()
-        )
-        await state.set_state(CreatePoll.waiting_question)
+    
     elif m.text == "❓ Помощь":
         await m.answer(
             "🤖 **Команды бота КИНОман:**\n\n"
@@ -130,14 +120,30 @@ async def cmd_menu(m: types.Message):
             "💬 **ИИ-помощник:** напиши любой вопрос про кино, и я отвечу!\n"
             "Например: «Какой фильм посоветуешь на вечер?»"
         )
+    
+    elif m.text == "📋 Создать опрос":
+        # Проверяем, что это админ
+        if m.from_user.id != ADMIN_ID:
+            await m.answer("⛔ Эта функция доступна только администратору!")
+            return
+        
+        await m.answer(
+            "🎬 **Создание нового голосования**\n\n"
+            "Напиши вопрос для голосования, например:\n"
+            "«Какой фильм смотрим в пятницу?»",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+        await state.set_state(CreatePoll.waiting_question)
+    
     else:
+        # Главное меню (при /start)
         await m.answer(
             "Привет! Я бот КИНОман 🎬\n\n"
             "**Что я умею:**\n"
             "• 📅 Расписание — узнать, когда встречи\n"
             "• 📊 Итоги голосов — результаты последнего голосования\n"
-            "• 📋 Создать опрос — создать новое голосование (админ)\n"
-            "• ❓ Помощь — список команд\n\n"
+            "• ❓ Помощь — список команд\n"
+            "• 📋 Создать опрос — создать новое голосование (админ)\n\n"
             "💬 **А ещё:** я отвечаю на любые вопросы про кино!\n"
             "Просто напиши мне, например: «Какой фильм посоветуешь на вечер?»\n\n"
             "Выбери раздел ниже 👇",
@@ -182,11 +188,11 @@ async def cmd_active_poll(m: types.Message):
 @dp.message(Command("создать_опрос"))
 async def cmd_create_poll(m: types.Message, state: FSMContext):
     if m.from_user.id != ADMIN_ID:
-        await m.answer(" Эта команда доступна только администратору!")
+        await m.answer("⛔ Эта команда доступна только администратору!")
         return
     
     await m.answer(
-        " **Создание нового голосования**\n\n"
+        "🎬 **Создание нового голосования**\n\n"
         "Напиши вопрос для голосования, например:\n"
         "«Какой фильм смотрим в пятницу?»",
         reply_markup=types.ReplyKeyboardRemove()
